@@ -4,7 +4,6 @@
 #include "lexer.h"
 #include "parser.h"
 
-//Declare currentTokenIndex
 int currentTokenIndex = 0;
 
 // Get the current token
