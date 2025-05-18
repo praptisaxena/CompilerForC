@@ -1,7 +1,10 @@
 #ifndef AST_H
 #define AST_H
+#include "lexer.h"
 
 #define MAX_NAME_LEN 100
+
+extern int currentTokenIndex; 
 
 typedef enum {
     AST_FUNCTION,
@@ -28,5 +31,8 @@ typedef struct ASTNode {
 } ASTNode;
 
 ASTNode* createNode(ASTNodeType type);
+
+ASTNode* parseFunction();
+void printAST(ASTNode *node, int indent);
 
 #endif // AST_H
