@@ -6,55 +6,75 @@
 
 int currentTokenIndex = 0;
 
-// Get the current token
 Token* getCurrentToken() {
     if (currentTokenIndex < tokenCount)
         return &tokenTable[currentTokenIndex];
     return NULL;
 }
 
-void syntaxError(const char *message, Token *tok) {
-    if (tok) {
-        fprintf(stderr, "Syntax error: %s but found '%s' at line %d\n",
-                message, tok->lexeme, tok->line);
-    } else {
-        fprintf(stderr, "Syntax error: %s at end of input\n", message);
-    }
-    exit(1);
-}
-
-// Advance to next token and return it
 Token* getNextToken() {
     if (currentTokenIndex < tokenCount)
         return &tokenTable[currentTokenIndex++];
     return NULL;
 }
 
-// Match token lexeme, consume token if matched, else error
-void match(const char *expectedLexeme) {
+void match(const char *expected) {
     Token *tok = getCurrentToken();
-    if (!tok || strcmp(tok->lexeme, expectedLexeme) != 0) {
-        syntaxError(expectedLexeme, tok);
+    if (!tok || strcmp(tok->lexeme, expected) != 0) {
+        syntaxError(expected, tok);
     }
     currentTokenIndex++;
 }
 
-// Create AST node helper
+void syntaxError(const char *message, Token *tok) {
+    if (tok) {
+        fprintf(stderr, "Syntax error: %s but found '%s' at line %d\n", message, tok->lexeme, tok->line);
+    } else {
+        fprintf(stderr, "Syntax error: %s at end of input\n", message);
+    }
+    exit(1);
+}
+
 ASTNode* createNode(ASTNodeType type) {
     ASTNode *node = (ASTNode*) malloc(sizeof(ASTNode));
     node->type = type;
     node->name[0] = '\0';
-    node->body = NULL;
-    node->elseBody = NULL;
-    node->condition = NULL;
-    node->next = NULL;
+    node->body = node->condition = node->elseBody = node->next = NULL;
     return node;
 }
 
-// Forward declarations
 ASTNode* parseBlock();
 ASTNode* parseStatement();
 ASTNode* parseExpression();
+ASTNode* parseProgram();
+
+ASTNode* parseProgram() {
+    ASTNode *head = NULL, *tail = NULL;
+
+    while (currentTokenIndex < tokenCount) {
+        Token *tok = getCurrentToken();
+
+        ASTNode *node = NULL;
+
+        if (tok->type == TOKEN_PREPROCESSOR) {
+            node = createNode(AST_PREPROCESSOR);
+            strcpy(node->name, tok->lexeme);
+            currentTokenIndex++;
+        } else if (strcmp(tok->lexeme, "int") == 0) {
+            node = parseFunction();  
+        } else {
+            syntaxError("expected preprocessor directive or function", tok);
+        }
+
+        if (node) {
+            if (!head) head = node;
+            else tail->next = node;
+            tail = node;
+        }
+    }
+
+    return head;
+}
 
 ASTNode* parseFunction() {
     match("int");
@@ -66,19 +86,16 @@ ASTNode* parseFunction() {
 
     ASTNode *funcNode = createNode(AST_FUNCTION);
     strcpy(funcNode->name, name->lexeme);
-
     match("(");
     match(")");
-
     funcNode->body = parseBlock();
     return funcNode;
 }
 
-// Parse block: { statement* }
 ASTNode* parseBlock() {
     match("{");
     ASTNode *blockNode = createNode(AST_BLOCK);
-    ASTNode *lastStmt = NULL;
+    ASTNode *last = NULL;
 
     while (1) {
         Token *tok = getCurrentToken();
@@ -91,18 +108,14 @@ ASTNode* parseBlock() {
         ASTNode *stmt = parseStatement();
         if (!stmt) continue;
 
-        if (!blockNode->body)
-            blockNode->body = stmt;
-        else
-            lastStmt->next = stmt;
-
-        lastStmt = stmt;
+        if (!blockNode->body) blockNode->body = stmt;
+        else last->next = stmt;
+        last = stmt;
     }
 
     return blockNode;
 }
 
-// Parse a statement
 ASTNode* parseStatement() {
     Token *tok = getCurrentToken();
     if (!tok) return NULL;
@@ -110,8 +123,7 @@ ASTNode* parseStatement() {
     if (tok->type == TOKEN_KEYWORD &&
         (strcmp(tok->lexeme, "int") == 0 || strcmp(tok->lexeme, "float") == 0)) {
 
-        currentTokenIndex++; 
-
+        currentTokenIndex++;
         Token *id = getNextToken();
         if (!id || id->type != TOKEN_IDENTIFIER) {
             syntaxError("expected identifier", id);
@@ -119,13 +131,14 @@ ASTNode* parseStatement() {
 
         ASTNode *decl = createNode(AST_EXPRESSION);
         strcpy(decl->name, "declare");
+
         ASTNode *var = createNode(AST_EXPRESSION);
         strcpy(var->name, id->lexeme);
         decl->condition = var;
 
-        Token *next = getCurrentToken();
-        if (next && strcmp(next->lexeme, "=") == 0) {
-            currentTokenIndex++; 
+        tok = getCurrentToken();
+        if (tok && strcmp(tok->lexeme, "=") == 0) {
+            currentTokenIndex++;
             decl->body = parseExpression();
         }
 
@@ -133,7 +146,6 @@ ASTNode* parseStatement() {
         return decl;
     }
 
-    // If statement
     if (strcmp(tok->lexeme, "if") == 0) {
         currentTokenIndex++;
         ASTNode *ifNode = createNode(AST_IF);
@@ -147,11 +159,9 @@ ASTNode* parseStatement() {
             currentTokenIndex++;
             ifNode->elseBody = parseBlock();
         }
-
         return ifNode;
     }
 
-    // While loop
     if (strcmp(tok->lexeme, "while") == 0) {
         currentTokenIndex++;
         ASTNode *whileNode = createNode(AST_WHILE);
@@ -162,7 +172,6 @@ ASTNode* parseStatement() {
         return whileNode;
     }
 
-    // Return statement
     if (strcmp(tok->lexeme, "return") == 0) {
         currentTokenIndex++;
         ASTNode *retNode = createNode(AST_EXPRESSION);
@@ -172,70 +181,74 @@ ASTNode* parseStatement() {
         return retNode;
     }
 
-    // Block
     if (strcmp(tok->lexeme, "{") == 0) {
         return parseBlock();
     }
 
-    // Assignment or expression
     if (tok->type == TOKEN_IDENTIFIER) {
-        ASTNode *assignNode = createNode(AST_EXPRESSION);
-        strcpy(assignNode->name, "=");
+        Token *id = tok;
+        currentTokenIndex++;
 
-        ASTNode *lhs = createNode(AST_EXPRESSION);
-        strcpy(lhs->name, tok->lexeme);
-        currentTokenIndex++;  // consume identifier
+        if (strcmp(getCurrentToken()->lexeme, "=") == 0) {
+            currentTokenIndex++;
 
-        match("=");
-        ASTNode *rhs = parseExpression();
-        match(";");
+            ASTNode *assign = createNode(AST_EXPRESSION);
+            strcpy(assign->name, "=");
 
-        assignNode->condition = lhs;
-        assignNode->body = rhs;
-        return assignNode;
+            ASTNode *lhs = createNode(AST_EXPRESSION);
+            strcpy(lhs->name, id->lexeme);
+            assign->condition = lhs;
+
+            assign->body = parseExpression();
+            match(";");
+            return assign;
+        } else {
+            syntaxError("expected '=' after identifier", getCurrentToken());
+        }
     }
 
     syntaxError("unknown statement", tok);
     return NULL;
 }
 
-// Parse expression (basic binary expressions)
 ASTNode* parseExpression() {
     Token *tok = getCurrentToken();
     if (!tok) syntaxError("unexpected EOF in expression", NULL);
 
-    ASTNode *left = createNode(AST_EXPRESSION);
-    strcpy(left->name, tok->lexeme);
-    currentTokenIndex++;
+    ASTNode *left = NULL;
 
-    Token *op = getCurrentToken();
-    if (op && (
-        strcmp(op->lexeme, "+") == 0 || strcmp(op->lexeme, "-") == 0 ||
-        strcmp(op->lexeme, "*") == 0 || strcmp(op->lexeme, "/") == 0 ||
-        strcmp(op->lexeme, ">") == 0 || strcmp(op->lexeme, "<") == 0 ||
-        strcmp(op->lexeme, "==") == 0 || strcmp(op->lexeme, "!=") == 0 ||
-        strcmp(op->lexeme, ">=") == 0 || strcmp(op->lexeme, "<=") == 0)) {
+    if (strcmp(tok->lexeme, "(") == 0) {
+        match("(");
+        left = parseExpression();
+        match(")");
+    } else {
+        left = createNode(AST_EXPRESSION);
+        strcpy(left->name, tok->lexeme);
+        currentTokenIndex++;
+    }
 
-        ASTNode *binExpr = createNode(AST_EXPRESSION);
-        strcpy(binExpr->name, op->lexeme);
+    tok = getCurrentToken();
+    if (tok && (
+        strcmp(tok->lexeme, "+") == 0 || strcmp(tok->lexeme, "-") == 0 ||
+        strcmp(tok->lexeme, "*") == 0 || strcmp(tok->lexeme, "/") == 0 ||
+        strcmp(tok->lexeme, "==") == 0 || strcmp(tok->lexeme, "!=") == 0 ||
+        strcmp(tok->lexeme, ">=") == 0 || strcmp(tok->lexeme, "<=") == 0 ||
+        strcmp(tok->lexeme, "<") == 0 || strcmp(tok->lexeme, ">") == 0)) {
+
+        ASTNode *opNode = createNode(AST_EXPRESSION);
+        strcpy(opNode->name, tok->lexeme);
         currentTokenIndex++;
 
-        ASTNode *right = createNode(AST_EXPRESSION);
-        Token *rightTok = getCurrentToken();
-        if (!rightTok) syntaxError("expected right operand", NULL);
+        ASTNode *right = parseExpression();
 
-        strcpy(right->name, rightTok->lexeme);
-        currentTokenIndex++;
-
-        binExpr->condition = left;
-        binExpr->body = right;
-        return binExpr;
+        opNode->condition = left;
+        opNode->body = right;
+        return opNode;
     }
 
     return left;
 }
 
-// Print AST
 void printAST(ASTNode *node, int indent) {
     if (!node) return;
 
@@ -257,6 +270,9 @@ void printAST(ASTNode *node, int indent) {
         case AST_EXPRESSION:
             printf("Expr: %s\n", node->name);
             break;
+        case AST_PREPROCESSOR:
+            printf("Preprocessor: %s\n", node->name);
+            break;
         default:
             printf("Unknown\n");
     }
@@ -268,5 +284,6 @@ void printAST(ASTNode *node, int indent) {
         printf("Else\n");
         printAST(node->elseBody, indent + 1);
     }
+
     printAST(node->next, indent);
 }
