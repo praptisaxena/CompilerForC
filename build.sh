@@ -1,4 +1,4 @@
 # #!/bin/bash
 # gcc lexer.c -o main -Wall -Wextra
 #!/bin/bash
-gcc lexer.c main.c -o main -Wall -Wextra
+gcc main.c lexer.c parser.c semantic.c codegen.c -o main -Wall -Wextra
