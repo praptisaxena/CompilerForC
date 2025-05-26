@@ -35,3 +35,4 @@ void syntaxError(const char *message, Token *tok);
 
 
 #endif
+
