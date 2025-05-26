@@ -227,3 +227,4 @@ void runLexer(const char *filename) {
     printTokenTable();
     exportTokenTable("tokens.txt");
 }
+
