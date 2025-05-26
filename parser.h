@@ -12,6 +12,7 @@ typedef enum {
     AST_IF,
     AST_WHILE,
     AST_FOR,
+    AST_PREPROCESSOR,
     AST_EXPRESSION,
     AST_STATEMENT,
 
@@ -26,13 +27,14 @@ typedef struct ASTNode {
     struct ASTNode *elseBody;
 
     struct ASTNode *condition;
-    struct ASTNode *next;  // for linked lists of statements or expressions
+    struct ASTNode *next;
 
 } ASTNode;
 
 ASTNode* createNode(ASTNodeType type);
 
 ASTNode* parseFunction();
+ASTNode* parseProgram();
 void printAST(ASTNode *node, int indent);
 
-#endif // AST_H
+#endif
