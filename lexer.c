@@ -160,8 +160,8 @@ void runLexer(const char *filename) {
             buffer[i++] = ch;
             ch = fgetc(fp);
             if (ch == '\\') buffer[i++] = ch;
-            buffer[i++] = fgetc(fp); // actual char or escape
-            buffer[i++] = fgetc(fp); // closing '
+            buffer[i++] = fgetc(fp);
+            buffer[i++] = fgetc(fp); 
             buffer[i] = '\0';
             addToken(TOKEN_CHAR, buffer, line);
         }
@@ -227,4 +227,5 @@ void runLexer(const char *filename) {
     printTokenTable();
     exportTokenTable("tokens.txt");
 }
+
 
