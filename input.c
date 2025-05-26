@@ -1,15 +1,15 @@
+#include <stdio.h>
+
 int main() {
     int x = 5;
-    int y;
-    y = x + 3;
+    int y = 10;
+    int z = x + y * 2;
     
-    if (y > 5) {
-        y = y - 1;
+    if (z > 20) {
+        z = z - 5;
     } else {
-        y = y + 1;
+        z = z + 5;
     }
     
-    while (y < 10) {
-        y = y + 1;
-    }
+    return z;
 }
