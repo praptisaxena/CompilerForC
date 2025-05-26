@@ -20,12 +20,12 @@ enum TokenType {
 };
 
 typedef struct {
-    int type;                      // Use enum TokenType here
+    int type;                      
     char lexeme[MAX_LEXEME_LEN];
     int line;
 } Token;
 
-extern Token tokenTable[MAX_TOKENS];  // just declare here
+extern Token tokenTable[MAX_TOKENS];
 extern int tokenCount;
 
 void runLexer(const char *filename);
@@ -35,4 +35,5 @@ void syntaxError(const char *message, Token *tok);
 
 
 #endif
+
 
